@@ -1,0 +1,71 @@
+def resolve_table_path(table_name):
+    return Path(f"../data/{BATCH_ID}/{table_name}_{BATCH_ID}.csv").resolve()
+
+def resolve_entity_schema(entity):
+    schema = SCHEMAS[entity]
+
+    if "_corrupt_record" in schema.fieldNames():
+        return schema
+
+    return StructType(
+        schema.fields + [
+            StructField("_corrupt_record", StringType(), True)
+        ]
+    )
+
+def read_table(spark, schema, path):
+    df = (
+        spark.read
+        .option("header", "true")
+        .schema(schema)
+        .option("delimiter", ",")
+        .option("multiline", "true")
+        .option("mode", "permissive")
+        .option("columnNameOfCorruptRecord", "_corrupt_record")
+        .csv(str(path))
+    )
+    return df
+
+def load_df(spark, entity):
+    table_schema = resolve_entity_schema(entity)
+    table_path = resolve_table_path(entity)
+    df = read_table(spark, table_schema, table_path)
+    return df
+
+def add_metadata_columns(df, batch_id, run_id, source_system):
+
+
+    row_json = F.to_json(
+        F.struct(*[F.col(name) for name in df.columns ]),
+        options={"ignoreNullFields": "false"},
+    )
+
+    return (df
+        .withColumn("_record_hash", F.sha2(row_json, 256))
+        .withColumn("_batch_id", F.lit(batch_id))
+        .withColumn("_run_id", F.lit(run_id))
+        .withColumn("_source_system", F.lit(source_system))
+        .withColumn("_ingested_timestamp", F.current_timestamp())
+    )
+
+def idempotent_write(df, target):
+    # TODO:
+    #
+    pass
+
+def ingest_batch(spark, config, entities):
+    RUN_ID = str(uuid.uuid4())
+    
+    for entity in entities:
+        source_path = resolve_table_path(entity)
+        schema = resolve_entity_schema(entity)
+        df = read_table(spark, schema, source_path)
+        
+        df = add_metadata_columns(
+            df,
+            batch_id=config.batch_id,
+            run_id=RUN_ID,
+            source_system=config.source_system,
+        )
+
+        idempotent_write(df, config.bronze_root / entity)
