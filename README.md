@@ -33,9 +33,8 @@ java -version
 
 ### 2. Clone the repository
 
-Clone it into a directory named `data_pipeline`. Current imports use both
-`data_pipeline.src` and `src`, so the test command below adds the project folder
-and its parent to Python's import path.
+Clone it into a directory named `data_pipeline`. Run pytest from the project
+root so the `src` package and other project-level modules are importable.
 
 ```bash
 git clone https://github.com/<your-username>/<repository-name>.git data_pipeline
@@ -78,7 +77,7 @@ architecture suffix.
 From the repository root, run:
 
 ```bash
-PYTHONPATH="$PWD:$PWD/.." python -m pytest testing
+python -m pytest testing
 ```
 
 The tests use a local Spark session. Delta Lake may need to download its JVM

@@ -15,19 +15,19 @@ def add_record_hash(df: DataFrame) -> DataFrame:
         .withColumn(
             "_record_hash",
             F.sha2(row_json, 256)
-        )
+        ) 
     )
 
 def add_ingestion_metadata(
     df: DataFrame,
-    batch_id: str,
+    source_batch_id: str,
     run_id: str,
     source_system: str,
 ) -> DataFrame:
     """Add batch, run, source-system, and ingestion-time columns."""
     return (df
-            .withColumn("_batch_id", F.lit(batch_id))
-            .withColumn("_run_id", F.lit(run_id))
+            .withColumn("_source_batch_id", F.lit(source_batch_id))
+            .withColumn("_pipeline_run_id", F.lit(run_id))
             .withColumn("_source_system", F.lit(source_system))
             .withColumn("_ingested_timestamp", F.current_timestamp())
         )
@@ -35,9 +35,11 @@ def add_ingestion_metadata(
 
 def add_metadata_columns(
     df: DataFrame,
-    batch_id: str,
-    run_id: str,
+    source_batch_id: str,
+    pipeline_run_id: str,
     source_system: str,
 ) -> DataFrame:
     """Add the record hash and ingestion metadata to the source DataFrame."""
-    raise NotImplementedError
+    df = add_record_hash(df)
+    df = add_ingestion_metadata(df, source_batch_id, pipeline_run_id, source_system)
+    return df

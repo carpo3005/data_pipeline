@@ -5,12 +5,12 @@ from pyspark.sql import Row
 from pyspark.sql.types import StringType, StructField, StructType
 from pyspark.sql import DataFrame
 
-from data_pipeline.src.bronze_source import load_entity_data, read_source_csv
-from data_pipeline.src.spark_setup import get_spark_session
+from src.bronze_source import load_entity_data, read_source_csv
+from src.spark_setup import get_spark_session
 
-from data_pipeline.src.bronze_source import resolve_source_path
-from data_pipeline.Configs.bronze_schemas import SCHEMAS
-from data_pipeline.src.bronze_source import resolve_entity_schema
+from src.bronze_source import resolve_source_path
+from Configs.bronze_schemas import SCHEMAS
+from src.bronze_source import resolve_entity_schema
 
 def test_resolve_source_path_uses_batch_and_entity(tmp_path):
     # Arrange: choose the inputs and expected result.

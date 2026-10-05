@@ -6,17 +6,17 @@ import uuid
 
 from pyspark.sql import SparkSession
 
-from data_pipeline.src.bronze_metadata import add_metadata_columns
-from data_pipeline.src.bronze_source import load_entity_data
-from data_pipeline.src.bronze_validation import validate_bronze_data
-from data_pipeline.src.bronze_writer import write_bronze_data
+from src.bronze_metadata import add_metadata_columns
+from src.bronze_source import load_entity_data
+from src.bronze_validation import validate_bronze_data
+from src.bronze_writer import write_bronze_data
 
 
 @dataclass(frozen=True)
 class BronzeIngestionConfig:
     data_root: Path
     bronze_root: Path
-    batch_id: str
+    source_batch_id: str
     source_system: str
 
 
@@ -36,16 +36,16 @@ ENTITIES = [
 
 def ingest_batch(spark: SparkSession, config: BronzeIngestionConfig, entities: list[str]) -> None:
     """Ingest the selected entities using one run ID for the whole batch."""
-    run_id = str(uuid.uuid4())
+    pipeline_run_id = str(uuid.uuid4())
     for entity in entities:
-        ingest_entity(spark, config, entity, run_id)
+        ingest_entity(spark, config, entity, pipeline_run_id)
 
 
 def ingest_entity(
     spark: SparkSession,
     config: BronzeIngestionConfig,
     entity: str,
-    run_id: str,
+    pipeline_run_id: str,
 ) -> None:
     """Load, enrich, validate, and write one entity."""
     df = load_entity_data(
@@ -57,7 +57,7 @@ def ingest_entity(
     df = add_metadata_columns(
         df=df,
         batch_id=config.batch_id,
-        run_id=run_id,
+        pipeline_run_id=pipeline_run_id,
         source_system=config.source_system,
     )
     validate_bronze_data(df, entity)

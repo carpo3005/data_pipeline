@@ -5,7 +5,7 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import StringType, StructField, StructType
 
-from data_pipeline.Configs.bronze_schemas import SCHEMAS
+from Configs.bronze_schemas import SCHEMAS
 
 
 def resolve_source_path(data_root: Path, batch_id: str, entity: str) -> Path:

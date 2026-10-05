@@ -1,6 +1,6 @@
 import pytest
 from pyspark.sql import SparkSession
-from data_pipeline.src.spark_setup import get_spark_session
+from src.spark_setup import get_spark_session
 
 def test_spark_setup():
     """
