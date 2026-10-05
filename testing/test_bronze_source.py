@@ -124,14 +124,28 @@ def test_read_source_csv_captures_corrupt_record(tmp_path, spark):
     assert rows[0]["_corrupt_record"] == corrupt_row
 
 
-def test_load_entity_data(spark):
-    
+def test_load_entity_data(spark, tmp_path):
+    batch_id = "B001"
+    entity = "customer"
+    batch_dir = tmp_path / batch_id
+    batch_dir.mkdir()
+    (batch_dir / f"{entity}_{batch_id}.csv").write_text(
+        "source_record_id,customer_id,first_name,last_name,email,phone,"
+        "date_of_birth,loyalty_status,marketing_opt_in,created_at,updated_at\n"
+        "r1,c1,Test,User,test@example.com,555-0100,2000-01-01,gold,false,"
+        "2025-01-01,2025-01-02\n",
+        encoding="utf-8",
+    )
+
     df = load_entity_data(
         spark,
-        data_root=Path("data_pipeline/data"),
-        batch_id="B001",
-        entity="customer",
+        data_root=tmp_path,
+        batch_id=batch_id,
+        entity=entity,
     )
 
     assert isinstance(df, DataFrame)
-    #assert df.count() == 2
+    rows = df.collect()
+    assert len(rows) == 1
+    assert rows[0]["source_record_id"] == "r1"
+    assert rows[0]["customer_id"] == "c1"

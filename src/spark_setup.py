@@ -3,14 +3,14 @@ from pathlib import Path
 from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
 
-def get_spark_session(app_name: str = "data_pipeline") -> SparkSession:
+def get_spark_session(app_name: str = "data_pipeline", warehouse_path = None) -> SparkSession:
     """
     Create and return a SparkSession with the specified application name.
 
     Args:
         app_name (str): The name of the Spark application.
     """
-    warehouse_path = Path.home() / ".local/share/Project_Mercury/spark-warehouse"
+    warehouse_path = warehouse_path or Path.home() / ".local/share/Project_Mercury/spark-warehouse"
 
     builder = (
         SparkSession.builder

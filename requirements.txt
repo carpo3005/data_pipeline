@@ -1,0 +1,7 @@
+# System prerequisite (install separately; not a pip package):
+# Ubuntu: sudo apt install -y openjdk-17-jdk
+# Spark requires Java 17 or newer.
+delta-spark==4.3.1
+ipykernel==7.4.0
+pyspark==4.1.1
+pytest==9.1.1

@@ -1,5 +1,8 @@
-__pychache__/
+__pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
 venv/
+.ipynb_checkpoints/
+spark-warehouse/
+/data/
