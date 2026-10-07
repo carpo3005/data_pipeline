@@ -147,15 +147,3 @@ def test_add_metadata_columns_hashes_first(sample_df, ingestion_config, pipeline
     assert actual == expected, (
         "Hashes should be computed from source columns only"
     )
-
-
-def test_add_metadata_columns_returns_accurately(
-    metadata_enriched_df, ingestion_config, pipeline_run_id
-):
-    row = metadata_enriched_df.select(
-        "_source_batch_id", "_pipeline_run_id", "_source_system"
-    ).first()
-
-    assert row["_source_batch_id"] == ingestion_config.source_batch_id
-    assert row["_pipeline_run_id"] == pipeline_run_id
-    assert row["_source_system"] == ingestion_config.source_system

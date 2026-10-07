@@ -17,21 +17,22 @@ application entry point
 └── creates/configures SparkSession and BronzeIngestionConfig
     └── ingest_batch
         └── ingest_entity (once per selected entity)
-            ├── load_entity_data
+            ├── load_entity_data → LoadedEntityData
             │   ├── resolve_source_path
             │   ├── resolve_entity_schema
             │   └── read_source_csv
-            ├── add_metadata_columns
+            ├── add_metadata_columns → DataFrame
             │   ├── add_record_hash
             │   └── add_ingestion_metadata
-            ├── validate_bronze_data
+            ├── validate_bronze_data → ValidationReport
             │   ├── check_required_columns
             │   ├── collect_validation_metrics
             │   └── apply_validation_policy
-            └── write_bronze_data
+            ├── write_bronze_data → WriteMetrics
                 ├── prepare_merge_source
                 ├── create_delta_table (first write)
                 └── merge_new_records (later writes)
+            └── append_audit_record → bronze/ingestion_audit
 ```
 
 The application entry point owns Spark session creation and shutdown.
@@ -60,7 +61,8 @@ Responsible for reading raw source data:
 - `resolve_entity_schema` selects the entity's raw schema and includes the
   corrupt-record column.
 - `read_source_csv` applies the CSV read options.
-- `load_entity_data` combines path resolution, schema resolution, and reading.
+- `load_entity_data` combines path resolution, schema resolution, and reading;
+  it returns the DataFrame with source filename/path provenance.
 
 Keep this module independent of ingestion orchestration so source reading can
 be tested separately.
@@ -73,6 +75,8 @@ Responsible for adding derived and operational metadata:
 - `add_ingestion_metadata` adds fields such as batch ID, run ID, source system,
   and ingestion timestamp.
 - `add_metadata_columns` composes those operations into the enrichment step.
+  It returns the enriched DataFrame with the batch, run, and source-system
+  identifiers applied.
 
 The hash's input columns define payload equality. Exclude values that change
 between replays, such as run ID and ingestion timestamp. Keep the selected
@@ -110,6 +114,7 @@ Responsible only for Delta persistence:
 - `create_delta_table` handles a target's first write.
 - `merge_new_records` handles subsequent insert-only merges.
 - `write_bronze_data` selects the first-write or merge path.
+  It returns replay, insert, conflict, and resulting target row counts.
 
 The writer may check technical prerequisites needed to execute a write, such
 as whether the merge key is present. Business/data-quality validation belongs
@@ -146,12 +151,34 @@ flow.
 ## Configuration and run state
 
 `BronzeIngestionConfig` contains settings that describe the input/output
-locations and source batch: `data_root`, `bronze_root`, `batch_id`, and
+locations and source batch: `data_root`, `bronze_root`, `source_batch_id`, and
 `source_system`. Pass these explicitly to the operation that needs them.
 
 The `run_id` is generated once in `ingest_batch` and passed to each entity
 ingestion. Avoid module-level mutable run settings; module imports should not
 implicitly start or configure a run.
+
+## Ingestion audit
+
+Each `ingest_entity` call returns an `IngestionAuditRecord` and appends the
+same record to the path `bronze_root / "ingestion_audit"`. The audit row follows
+the supplied DDL. A failed load, validation, or write records `FAILED` and an
+error message before the exception is re-raised. Corrupt records remain
+non-blocking and produce `SUCCESS_WITH_WARNINGS`.
+
+Audit counts are sourced as follows:
+
+- Source row and data-quality counts come from `ValidationMetrics`.
+- Validation currently counts duplicate business keys using `source_record_id`
+  alone; it does not infer additional key columns from the DataFrame. Duplicate
+  IDs are compared exactly as supplied, so whitespace normalization belongs
+  upstream of bronze validation.
+- `duplicate_business_key_count` counts distinct duplicated IDs, while
+  `duplicate_rows_beyond_first` counts the additional rows in those groups.
+- Replay and hash-conflict counts compare incoming composite keys and hashes
+  with the existing Delta target.
+- Inserted count and target total are returned by the writer after the Delta
+  operation. A hash conflict blocks the merge, is audited, then raises.
 
 ## Suggested implementation and test order
 

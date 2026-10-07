@@ -6,7 +6,6 @@ from pyspark.sql.types import StringType, StructField, StructType
 from pyspark.sql import DataFrame
 
 from src.bronze_source import load_entity_data, read_source_csv
-from src.spark_setup import get_spark_session
 
 from src.bronze_source import resolve_source_path
 from Configs.bronze_schemas import SCHEMAS
@@ -14,12 +13,12 @@ from src.bronze_source import resolve_entity_schema
 
 def test_resolve_source_path_uses_batch_and_entity(tmp_path):
     # Arrange: choose the inputs and expected result.
-    batch_id = "B001"
+    source_batch_id = "B001"
     entity = "customer"
     expected = tmp_path / "B001" / "customer_B001.csv"
 
     # Act: call the function being tested.
-    actual = resolve_source_path(tmp_path, batch_id, entity)
+    actual = resolve_source_path(tmp_path, source_batch_id, entity)
 
     # Assert: compare the result with what you expect.
     assert actual == expected
@@ -46,12 +45,6 @@ def test_resolve_entity_schema_does_not_duplicate_corrupt_record(monkeypatch):
     actual = resolve_entity_schema("test_entity")
 
     assert actual == schema
-
-@pytest.fixture(scope="module")
-def spark():
-    session = get_spark_session("test_bronze_source")
-    yield session
-    session.stop()
 
 def test_read_source_csv_reads_headers_and_rows(tmp_path, spark):
     # Arrange: create a tiny CSV and the schema the reader should use.
@@ -125,11 +118,11 @@ def test_read_source_csv_captures_corrupt_record(tmp_path, spark):
 
 
 def test_load_entity_data(spark, tmp_path):
-    batch_id = "B001"
+    source_batch_id = "B001"
     entity = "customer"
-    batch_dir = tmp_path / batch_id
+    batch_dir = tmp_path / source_batch_id
     batch_dir.mkdir()
-    (batch_dir / f"{entity}_{batch_id}.csv").write_text(
+    (batch_dir / f"{entity}_{source_batch_id}.csv").write_text(
         "source_record_id,customer_id,first_name,last_name,email,phone,"
         "date_of_birth,loyalty_status,marketing_opt_in,created_at,updated_at\n"
         "r1,c1,Test,User,test@example.com,555-0100,2000-01-01,gold,false,"
@@ -137,15 +130,15 @@ def test_load_entity_data(spark, tmp_path):
         encoding="utf-8",
     )
 
-    df = load_entity_data(
+    dataframe = load_entity_data(
         spark,
         data_root=tmp_path,
-        batch_id=batch_id,
+        source_batch_id=source_batch_id,
         entity=entity,
     )
 
-    assert isinstance(df, DataFrame)
-    rows = df.collect()
+    assert isinstance(dataframe, DataFrame)
+    rows = dataframe.collect()
     assert len(rows) == 1
     assert rows[0]["source_record_id"] == "r1"
     assert rows[0]["customer_id"] == "c1"

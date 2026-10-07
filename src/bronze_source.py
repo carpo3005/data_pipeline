@@ -8,9 +8,9 @@ from pyspark.sql.types import StringType, StructField, StructType
 from Configs.bronze_schemas import SCHEMAS
 
 
-def resolve_source_path(data_root: Path, batch_id: str, entity: str) -> Path:
+def resolve_source_path(data_root: Path, source_batch_id: str, entity: str) -> Path:
     """Build the source CSV path for one entity and batch."""
-    source_path = data_root / batch_id / f"{entity}_{batch_id}.csv"
+    source_path = data_root / source_batch_id / f"{entity}_{source_batch_id}.csv"
     return source_path
 
 def resolve_entity_schema(entity: str) -> StructType:
@@ -46,11 +46,10 @@ def read_source_csv(
 def load_entity_data(
     spark: SparkSession,
     data_root: Path,
-    batch_id: str,
+    source_batch_id: str,
     entity: str,
 ) -> DataFrame:
-    """Resolve the path and schema, then read one entity's source CSV."""
-    source_path = resolve_source_path(data_root, batch_id, entity)
+    """Load an entity CSV and return its DataFrame."""
+    source_path = resolve_source_path(data_root, source_batch_id, entity)
     schema = resolve_entity_schema(entity)
     return read_source_csv(spark, schema, source_path)
-

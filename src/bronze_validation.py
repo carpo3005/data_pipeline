@@ -14,10 +14,11 @@ from Configs.metadata_columns import METADATA_COLUMNS
 @dataclass(frozen=True)
 class ValidationMetrics:
     row_count: int
-    null_or_blank_source_record_id_count: int
-    distinct_duplicated_source_record_id_count: int
+    null_or_blank_source_record_id_count: int | None
+    distinct_duplicated_source_record_id_count: int | None
     corrupt_record_count: int
     null_record_hash_count: int
+    duplicate_rows_beyond_first_count: int | None = 0
 
 
 @dataclass(frozen=True)
@@ -51,20 +52,30 @@ def check_required_columns(df: DataFrame, entity: str) -> tuple[str, ...]:
 
 def collect_validation_metrics(df: DataFrame) -> ValidationMetrics:
     """Collect row-level quality counts using Spark aggregations."""
-    
-    row_count = df.count()
-    duplicate_id_groups = _count_distinct_duplicated_source_ids(df)
-    null_id_count = _count_null_ids(df)
-    corrupt_record_count = _count_corrupt_records(df)
-    null_record_hash_count = _count_null_hashes(df)
+    cached_df = df.cache()
+    try:
+        row_count = cached_df.count()
+        if "source_record_id" in cached_df.columns:
+            duplicate_id_groups = _count_distinct_duplicated_source_ids(cached_df)
+            duplicate_rows_beyond_first = _count_duplicate_rows_beyond_first(cached_df)
+            null_id_count = _count_null_ids(cached_df)
+        else:
+            duplicate_id_groups = None
+            duplicate_rows_beyond_first = None
+            null_id_count = None
+        corrupt_record_count = _count_corrupt_records(cached_df)
+        null_record_hash_count = _count_null_hashes(cached_df)
 
-    return ValidationMetrics(
-        row_count=row_count,
-        null_or_blank_source_record_id_count=null_id_count,
-        distinct_duplicated_source_record_id_count=duplicate_id_groups,
-        corrupt_record_count=corrupt_record_count,
-        null_record_hash_count=null_record_hash_count,
-    )
+        return ValidationMetrics(
+            row_count=row_count,
+            null_or_blank_source_record_id_count=null_id_count,
+            distinct_duplicated_source_record_id_count=duplicate_id_groups,
+            corrupt_record_count=corrupt_record_count,
+            null_record_hash_count=null_record_hash_count,
+            duplicate_rows_beyond_first_count=duplicate_rows_beyond_first,
+        )
+    finally:
+        cached_df.unpersist()
 
 
 def apply_validation_policy(report: ValidationReport) -> None:
@@ -104,30 +115,40 @@ def validate_bronze_data(df: DataFrame, entity: str) -> ValidationReport:
 
 
 def _count_distinct_duplicated_source_ids(df: DataFrame) -> int:
-    normalized_ids = (
-        df.select(
-            F.trim(F.col("source_record_id")).alias("source_record_id")
-        )
-        .filter(
-            F.col("source_record_id").isNotNull()
-            & (F.col("source_record_id") != "")
-        )
+    nonblank_ids = df.filter(
+        F.col("source_record_id").isNotNull()
+        & (F.col("source_record_id") != "")
     )
 
     return (
-        normalized_ids
+        nonblank_ids
         .groupBy("source_record_id")
         .count()
         .filter(F.col("count") > 1)
         .count()
     )
 
+
+def _count_duplicate_rows_beyond_first(df: DataFrame) -> int:
+    nonblank_ids = df.filter(
+        F.col("source_record_id").isNotNull()
+        & (F.col("source_record_id") != "")
+    )
+    duplicate_group_counts = (
+        nonblank_ids
+        .groupBy("source_record_id")
+        .count()
+        .filter(F.col("count") > 1)
+    )
+    return duplicate_group_counts.agg(
+        F.coalesce(F.sum(F.col("count") - 1), F.lit(0)).alias("duplicate_rows")
+    ).first()["duplicate_rows"]
 def _count_null_ids(df: DataFrame) -> int:
     return (
         df
         .filter(
             F.col("source_record_id").isNull()
-            | (F.trim(F.col("source_record_id")) == "")
+            | (F.col("source_record_id") == "")
         )
     ).count()
 

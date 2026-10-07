@@ -21,11 +21,11 @@ application entry point
     └── ingest_batch(spark, config, entities)
         ├── create one pipeline run ID for the batch
         └── ingest_entity(spark, config, entity, pipeline_run_id)
-            ├── load_entity_data(...)
+            ├── load_entity_data(...) → LoadedEntityData
             │   ├── resolve_source_path(...)
             │   ├── resolve_entity_schema(...)
             │   └── read_source_csv(...)
-            ├── add_metadata_columns(...)
+            ├── add_metadata_columns(...) → DataFrame
             │   ├── add_record_hash(...)
             │   └── add_ingestion_metadata(...)
             ├── validate_bronze_data(df, entity)
@@ -33,10 +33,11 @@ application entry point
             │   ├── collect_validation_metrics(df)
             │   ├── build ValidationReport
             │   └── apply_validation_policy(report)
-            └── write_bronze_data(...)
+            ├── write_bronze_data(...) → WriteMetrics
                 ├── prepare_merge_source(...)
                 ├── create_delta_table(...)  [first write]
                 └── merge_new_records(...)   [subsequent writes]
+            └── append_audit_record(...) → bronze/ingestion_audit
 ```
 
 `ingest_batch` is the batch-level orchestrator: create one run ID and reuse it
@@ -134,7 +135,9 @@ Implement from leaf operations upward:
 Use a Spark fixture and temporary paths in tests. Spark session lifecycle stays
 in the test/entry-point layer, not in ingestion helpers.
 
-> **Name/API consistency note:** the original outline calls the source batch
-> field `batch_id`; current code has been evolving toward `source_batch_id`.
-> Align config fields and function parameter names across the modules before
-> wiring the orchestration end-to-end.
+All source-batch configuration and source-loading APIs use
+`source_batch_id` consistently.
+
+Each entity ingestion returns an `IngestionAuditRecord` and appends it to
+`bronze_root / "ingestion_audit"`. The record combines source provenance,
+validation metrics, Delta write metrics, status, and any failure message.

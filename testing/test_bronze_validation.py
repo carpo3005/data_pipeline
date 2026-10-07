@@ -130,6 +130,7 @@ def dirty_validation_metrics() -> ValidationMetrics:
         distinct_duplicated_source_record_id_count=1,
         corrupt_record_count=1,
         null_record_hash_count=2,
+        duplicate_rows_beyond_first_count=1,
     )
 
 @pytest.fixture
@@ -480,6 +481,7 @@ def test_validate_bronze_data_returns_report_for_quality_issues(
         distinct_duplicated_source_record_id_count=1,
         corrupt_record_count=1,
         null_record_hash_count=2,
+        duplicate_rows_beyond_first_count=1,
     )
     assert len(report.errors) == 3
     error_text = " ".join(report.errors).lower()
