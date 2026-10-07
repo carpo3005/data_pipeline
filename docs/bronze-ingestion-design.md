@@ -88,9 +88,13 @@ Responsible for checking the DataFrame against the bronze data contract:
   single Spark aggregation where practical.
 - `ValidationMetrics` stores those counts.
 - `ValidationReport` associates metrics and errors with an entity.
-- `apply_validation_policy` decides whether errors fail the entity, warn, or
-  are handled by another explicit policy.
 - `validate_bronze_data` coordinates the checks and returns a report.
+- `apply_validation_policy` warns for corrupt records and fails the entity
+  when the report contains blocking errors.
+
+Corrupt records are measured and reported as warnings, not blocking errors.
+Null or blank source IDs, duplicate source IDs, and null record hashes remain
+blocking when their metrics are nonzero.
 
 Validation should report or route duplicate data according to an explicit
 policy. It should not silently deduplicate rows. Decide separately whether

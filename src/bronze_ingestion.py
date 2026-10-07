@@ -8,7 +8,7 @@ from pyspark.sql import SparkSession
 
 from src.bronze_metadata import add_metadata_columns
 from src.bronze_source import load_entity_data
-from src.bronze_validation import validate_bronze_data
+from src.bronze_validation import apply_validation_policy, validate_bronze_data
 from src.bronze_writer import write_bronze_data
 
 
@@ -60,7 +60,8 @@ def ingest_entity(
         pipeline_run_id=pipeline_run_id,
         source_system=config.source_system,
     )
-    validate_bronze_data(df, entity)
+    validation_report = validate_bronze_data(df, entity)
+    apply_validation_policy(validation_report)
     write_bronze_data(
         spark=spark,
         df=df,

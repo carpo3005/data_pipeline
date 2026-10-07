@@ -72,11 +72,11 @@ it should not silently repair or deduplicate records.
 3. **Build a report:** `ValidationReport` associates the entity, metrics, and
    validation errors. Its `is_valid` property represents whether there are
    blocking errors.
-4. **Apply policy:** `apply_validation_policy(report)` explicitly decides
-   whether a report allows processing, warns, fails the entity, or follows
-   another configured route.
-5. **Coordinate:** `validate_bronze_data(df, entity)` runs the checks, builds
-   the report, applies the policy, and returns the report to its caller.
+4. **Apply policy:** the caller passes the report to
+   `apply_validation_policy(report)`. Corrupt records produce a warning;
+   blocking errors fail the entity.
+5. **Coordinate:** `validate_bronze_data(df, entity)` runs the checks and
+   returns the report for the caller to inspect and apply.
 
 ### Planned metrics
 
@@ -88,8 +88,9 @@ The current `ValidationMetrics` model lists:
 - `corrupt_record_count`
 - `null_record_hash_count`
 
-The checks should produce observable counts/errors. Whether a nonzero count is
-blocking is a policy decision, not something to hide inside metric collection.
+The checks should produce observable counts and errors. A nonzero corrupt
+record count is a warning; nonzero counts for the other quality metrics are
+blocking errors under the current policy.
 
 ### Tests to build around validation
 
@@ -112,7 +113,6 @@ blocking is a policy decision, not something to hide inside metric collection.
 - Whether invalid data blocks the entity, is quarantined, or is retained with
   quality metadata.
 - Whether duplicates within one batch are retained, audited, or reduced.
-- Which validation findings are warnings versus blocking errors.
 
 Do not make duplicate handling implicit in `collect_validation_metrics` or
 silently drop rows in validation. Keep detection/reporting separate from the
